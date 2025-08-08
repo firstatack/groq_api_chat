@@ -24,7 +24,7 @@ Cliente terminal interactivo para la API de Groq con:
 ---
 
 ## Menu usuario
-<img src="menuusuario.png" alt="menuser" width="400"/>
+<img src="menuusario.png" alt="menuser" width="400"/>
 
 ## Seleccion de modelo
 <img src="seleccionmodelo.png" alt="seleccionmodelo" width="400"/>
