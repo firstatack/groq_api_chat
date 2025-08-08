@@ -1,6 +1,5 @@
 # 🚀 Groq API Chat - Terminal Client
 
-![CLI Interface](https://via.placeholder.com/800x400?text=Terminal+Chat+Interface)
 
 ## 🔍 Descripción
 Cliente terminal interactivo para la API de Groq con:
@@ -18,6 +17,22 @@ Cliente terminal interactivo para la API de Groq con:
 | ⚙️ Configuración        | Ajusta temperatura/tokens            | Menú configuración|
 | 💻 Resaltado de código  | Soporte para Python/JS/JSON          | Automático       |
 | 🚀 Modo rápido          | Preguntas directas desde terminal    | `-q "pregunta"`  |
+
+## Menu principal
+<img src="menu_principal.png" alt="menuprincipal" width="400"/>
+
+---
+
+## Menu usuario
+<img src="menuusuario.png" alt="menuser" width="400"/>
+
+## Seleccion de modelo
+<img src="seleccionmodelo.png" alt="seleccionmodelo" width="400"/>
+
+---
+
+## Interfaz de Usuario
+<img src="usuario.png" alt="usuario" width="400"/>
 
 ## 🔑 Instalación
 

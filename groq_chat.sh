@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuración básica
-API_KEY="AQUI TU KEY--------------------------- YOU KEY HERE"  # 🔑 Tu clave API
+API_KEY="PEGA AQUI TU APY KEY"  # 🔑 Tu clave API_KEY
 API_URL="https://api.groq.com/openai/v1/chat/completions"
 MODELS_API_URL="https://api.groq.com/openai/v1/models"
 CHATS_DIR="$HOME/.groq_chats"
