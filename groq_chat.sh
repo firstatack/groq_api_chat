@@ -289,13 +289,13 @@ load_chat() {
     
     if [[ ${#chats[@]} -eq 0 || ! -f "${chats[0]}" ]]; then
         read -p "Presiona Enter para continuar..."
-        return
+        return 1
     fi
     
     read -p "" choice
     
     if [[ "$choice" =~ [qQ0] ]]; then
-        return
+        return 1
     fi
     
     if [[ "$choice" -ge 1 && "$choice" -le ${#chats[@]} ]]; then
@@ -304,25 +304,22 @@ load_chat() {
         
         # Extraer modelo y mensajes del chat
         MODEL=$(jq -r '.model' "$selected_chat")
-        messages=$(jq -r '.messages' "$selected_chat")
+        messages=$(jq '.messages' "$selected_chat")
+        
+        # Preparar el historial del chat para chat_loop
+        chat_history=()
+        while IFS= read -r line; do
+            if [[ "$line" == *'"role": "user"'* ]]; then
+                content=$(echo "$line" | jq -r '.content')
+                chat_history+=("$content")
+            elif [[ "$line" == *'"role": "assistant"'* ]]; then
+                content=$(echo "$line" | jq -r '.content')
+                chat_history+=("$content")
+            fi
+        done < <(echo "$messages" | jq -c '.[]')
         
         echo -e "\n${GREEN}Chat '${YELLOW}$chat_name${GREEN}' cargado correctamente.${NC}"
         echo -e "${CYAN}Modelo: ${YELLOW}$MODEL${NC}\n"
-        
-        # Mostrar historial del chat
-        if [[ $(jq '.messages | length' "$selected_chat") -gt 0 ]]; then
-            echo -e "${PURPLE}Historial del chat:${NC}"
-            jq -r '.messages[] | "\(.role): \(.content)"' "$selected_chat" | \
-            while IFS= read -r line; do
-                if [[ "$line" == user:* ]]; then
-                    echo -e "${BLUE}${line/user:/>> Tú:}${NC}"
-                else
-                    echo -e "${GREEN}${line/assistant:/🤖 Respuesta:}${NC}"
-                fi
-            done
-            echo ""
-        fi
-        
         return 0
     else
         echo -e "${RED}Opción inválida.${NC}"
@@ -374,10 +371,7 @@ save_chat() {
     chat_file="$CHATS_DIR/$chat_name.chat"
     
     # Crear JSON con la conversación
-    jq -n \
-        --arg model "$MODEL" \
-        --argjson messages "$(jq -n --argjson arr '[]' '$arr')" \
-        '{model: $model, messages: $messages}' > "$chat_file"
+    echo '{"model": "'"$MODEL"'", "messages": []}' > "$chat_file"
     
     # Agregar cada mensaje
     for ((i=0; i<${#chat_history[@]}; i++)); do
@@ -419,12 +413,24 @@ test_connection() {
 # Función para llamar a la API
 call_api() {
     local user_input="$1"
+    
+    # Construir el array de mensajes para la API
+    local api_messages='[]'
+    for ((i=0; i<${#chat_history[@]}; i++)); do
+        role=$([[ $((i%2)) -eq 0 ]] && echo "user" || echo "assistant")
+        content="${chat_history[$i]}"
+        api_messages=$(echo "$api_messages" | jq --arg role "$role" --arg content "$content" '. += [{"role": $role, "content": $content}]')
+    done
+    
+    # Agregar el nuevo mensaje del usuario
+    api_messages=$(echo "$api_messages" | jq --arg content "$user_input" '. += [{"role": "user", "content": $content}]')
+    
     curl -s -X POST "$API_URL" \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -d '{
             "model": "'"$MODEL"'",
-            "messages": [{"role": "user", "content": "'"$user_input"'"}],
+            "messages": '"$api_messages"',
             "temperature": '"$DEFAULT_TEMPERATURE"',
             "max_tokens": '"$DEFAULT_MAX_TOKENS"'
         }'
@@ -475,26 +481,29 @@ quick_question() {
 
 # Bucle principal del chat
 chat_loop() {
-    chat_history=()
     show_chat_header
     
     # Mostrar historial si existe
-    if [[ -n "$messages" && "$messages" != "[]" ]]; then
+    if [[ ${#chat_history[@]} -gt 0 ]]; then
         echo -e "${PURPLE}Historial del chat:${NC}"
-        jq -r '.messages[] | "\(.role): \(.content)"' "$CHATS_DIR/$chat_name.chat" | \
-        while IFS= read -r line; do
-            if [[ "$line" == user:* ]]; then
-                echo -e "${BLUE}${line/user:/>> Tú:}${NC}"
+        for ((i=0; i<${#chat_history[@]}; i++)); do
+            if [[ $((i%2)) -eq 0 ]]; then
+                echo -e "${BLUE}>> Tú: ${YELLOW}${chat_history[$i]}${NC}"
             else
-                echo -e "${GREEN}${line/assistant:/🤖 Respuesta:}${NC}"
+                echo -e "${GREEN}🤖 Respuesta: ${YELLOW}${chat_history[$i]}${NC}"
             fi
         done
         echo ""
     fi
     
     while true; do
-        echo -e "${BLUE}>> Tú:${NC}"
-        read -p "" user_input
+        echo -e "${BLUE}>> Tú: (Escribe tu mensaje y presiona Ctrl+D cuando termines)${NC}"
+        
+        # Leer múltiples líneas hasta EOF (Ctrl+D)
+        user_input=$(cat)
+        
+        # Eliminar espacios en blanco al inicio/final
+        user_input=$(echo "$user_input" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
         
         # Comandos especiales
         case $user_input in
@@ -517,6 +526,10 @@ chat_loop() {
             "/ayuda")
                 show_chat_help
                 show_chat_header
+                continue
+                ;;
+            "")
+                echo -e "${YELLOW}No se ingresó texto. Intenta nuevamente.${NC}"
                 continue
                 ;;
         esac
@@ -575,7 +588,7 @@ main_menu() {
             1)
                 if select_model; then
                     chat_name=""
-                    messages=""
+                    chat_history=()
                     if test_connection; then
                         chat_loop
                     fi
